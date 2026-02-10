@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Download, FileImage, FileText, Film } from "lucide-react";
 import JSZip from "jszip";
+import { authFetch } from "@/lib/api-client";
 
 const MAX_VIDEO_AUDIO_BYTES = 100 * 1024 * 1024; // 100MB
 
@@ -58,10 +59,12 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 async function downloadViaProxy(remoteUrl: string, filename: string) {
+  const { authHeaders: getAuthHeaders } = await import("@/lib/api-client");
   const proxyUrl =
     "/api/download?" +
     new URLSearchParams({ url: remoteUrl, filename }).toString();
-  const res = await fetch(proxyUrl);
+  const headers = await getAuthHeaders();
+  const res = await fetch(proxyUrl, { headers });
   if (!res.ok) throw new Error("Download failed");
   const blob = await res.blob();
   downloadBlob(blob, filename);
@@ -156,7 +159,7 @@ export default function ConvertPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/assets/upload", {
+      const res = await authFetch("/api/assets/upload", {
         method: "POST",
         body: form,
       });
@@ -180,7 +183,7 @@ export default function ConvertPage() {
       for (const file of Array.from(files)) {
         const form = new FormData();
         form.append("file", file);
-        const res = await fetch("/api/assets/upload", {
+        const res = await authFetch("/api/assets/upload", {
           method: "POST",
           body: form,
         });
@@ -222,7 +225,7 @@ export default function ConvertPage() {
         body = { ...body, targetFormat: audioFormat };
       }
 
-      const res = await fetch("/api/convert", {
+      const res = await authFetch("/api/convert", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -591,7 +594,9 @@ export default function ConvertPage() {
                                 url,
                                 filename: `page_${i + 1}.${ext}`,
                               }).toString();
-                            const res = await fetch(proxyUrl);
+                            const { authHeaders: getAuthHeaders } = await import("@/lib/api-client");
+                            const hdrs = await getAuthHeaders();
+                            const res = await fetch(proxyUrl, { headers: hdrs });
                             if (!res.ok)
                               throw new Error(`Failed to fetch page ${i + 1}`);
                             const blob = await res.blob();

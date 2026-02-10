@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useClerk, useUser } from "@clerk/nextjs";
+import { useAuth } from "@/components/AuthProvider";
 import {
   LogOutIcon,
   MenuIcon,
@@ -34,8 +34,7 @@ export default function AppLayout({
 }>) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { signOut } = useClerk();
-  const { user } = useUser();
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -126,20 +125,26 @@ export default function AppLayout({
         {user && (
           <div className="shrink-0 border-t border-base-300/40 p-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="avatar">
-                <div className="w-9 h-9 rounded-full ring-2 ring-base-300">
-                  <img
-                    src={user.imageUrl}
-                    alt={user.username || user.emailAddresses[0].emailAddress}
-                  />
+              <div className="avatar placeholder">
+                <div className="w-9 h-9 rounded-full ring-2 ring-base-300 bg-primary text-primary-content">
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || user.email || "User"}
+                    />
+                  ) : (
+                    <span className="text-sm font-bold">
+                      {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold truncate">
-                  {user.fullName || user.username || "User"}
+                  {user.displayName || "User"}
                 </p>
                 <p className="text-xs opacity-50 truncate">
-                  {user.emailAddresses[0].emailAddress}
+                  {user.email}
                 </p>
               </div>
             </div>
@@ -171,12 +176,15 @@ export default function AppLayout({
               Free Tier &middot; Unlimited (beta)
             </div>
             {user && (
-              <div className="avatar lg:hidden">
-                <div className="w-8 h-8 rounded-full">
-                  <img
-                    src={user.imageUrl}
-                    alt=""
-                  />
+              <div className="avatar placeholder lg:hidden">
+                <div className="w-8 h-8 rounded-full bg-primary text-primary-content">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" />
+                  ) : (
+                    <span className="text-xs font-bold">
+                      {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
               </div>
             )}

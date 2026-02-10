@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse, NextRequest } from "next/server";
-import {auth} from "@clerk/nextjs/server";
+import { verifyAuth } from "@/lib/auth";
 
 // Configuration
     cloudinary.config({ 
@@ -19,7 +19,7 @@ import {auth} from "@clerk/nextjs/server";
     }
 
 export async function POST(request: NextRequest) {
-    const {userId} = await auth();
+    const userId = await verifyAuth(request);
 
     if(!userId)
     {

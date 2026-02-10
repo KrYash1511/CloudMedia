@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cloudinary } from "@/lib/cloudinary-server";
 import { PDFDocument } from "pdf-lib";
@@ -36,8 +36,8 @@ type ConvertBody =
   | { assetId: string; kind: "pdf_to_image"; targetFormat: "jpg" | "png" | "webp"; density?: number }
   | { assetId: string; kind: "video_to_audio"; targetFormat: "mp3" | "wav" | "m4a"; audioBitrate?: string };
 
-  export async function POST(req: Request) {
-  const { userId } = await auth();
+  export async function POST(req: NextRequest) {
+  const userId = await verifyAuth(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as ConvertBody | null;

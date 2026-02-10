@@ -7,6 +7,7 @@ import {
   Shrink,
 } from "lucide-react";
 import { filesize } from "filesize";
+import { authHeaders } from "@/lib/api-client";
 
 export default function Home() {
   const [compressions, setCompressions] = useState<any[]>([]);
@@ -46,7 +47,9 @@ export default function Home() {
 
   const fetchCompressions = useCallback(async () => {
     try {
-      const response = await axios.get("/api/compressions");
+      const response = await axios.get("/api/compressions", {
+        headers: await authHeaders(),
+      });
       if (Array.isArray(response.data)) setCompressions(response.data);
       else throw new Error("Invalid response format");
     } catch (e) {
@@ -65,7 +68,8 @@ export default function Home() {
     const proxyUrl =
       "/api/download?" +
       new URLSearchParams({ url: remoteUrl, filename }).toString();
-    const res = await fetch(proxyUrl);
+    const headers = await authHeaders();
+    const res = await fetch(proxyUrl, { headers });
     if (!res.ok) throw new Error("Download failed");
     const blob = await res.blob();
     const blobUrl = window.URL.createObjectURL(blob);

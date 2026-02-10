@@ -10,8 +10,6 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.37.1",
-    "@clerk/themes": "^2.4.51",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "axios": "^1.13.5",
@@ -19,6 +17,8 @@
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.4",
     "filesize": "^11.0.13",
+    "firebase": "^12.9.0",
+    "firebase-admin": "^13.6.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",

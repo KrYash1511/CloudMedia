@@ -2,6 +2,7 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import { Download, Sparkles } from "lucide-react";
+import { authFetch, authHeaders } from "@/lib/api-client";
 
 type UploadedAsset = {
   assetId: string;
@@ -41,7 +42,8 @@ async function downloadViaProxy(remoteUrl: string, filename: string) {
   const proxyUrl =
     "/api/download?" +
     new URLSearchParams({ url: remoteUrl, filename }).toString();
-  const res = await fetch(proxyUrl);
+  const headers = await authHeaders();
+  const res = await fetch(proxyUrl, { headers });
   if (!res.ok) throw new Error("Download failed");
   const blob = await res.blob();
   downloadBlob(blob, filename);
@@ -112,7 +114,7 @@ export default function CompressMediaPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/assets/upload", {
+      const res = await authFetch("/api/assets/upload", {
         method: "POST",
         body: form,
       });
@@ -140,7 +142,7 @@ export default function CompressMediaPage() {
         else payload.targetMb = targetValue;
       }
 
-      const res = await fetch("/api/compress", {
+      const res = await authFetch("/api/compress", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),

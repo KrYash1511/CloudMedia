@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^\\$cmd = @\"\nserver 8\\.8\\.8\\.8\nset timeout=5\nset retry=1\nset vc\nset debug\nconcise-eagle-33\\.clerk\\.accounts\\.dev\\.\nclerk\\.accounts\\.dev\\.\nweb\\.dev\\.\nexit\n\"@; \\$cmd \\| nslookup$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

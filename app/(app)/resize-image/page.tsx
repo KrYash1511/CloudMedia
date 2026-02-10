@@ -17,6 +17,7 @@ import {
   Sparkles,
   Wand2,
 } from "lucide-react";
+import { authFetch } from "@/lib/api-client";
 
 const CUSTOM_KEY = "Custom (free size)" as const;
 
@@ -247,7 +248,7 @@ export default function ResizeImage() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("/api/image-upload", {
+      const response = await authFetch("/api/image-upload", {
         method: "POST",
         body: formData,
       });
