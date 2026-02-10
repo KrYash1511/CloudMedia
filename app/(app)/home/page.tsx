@@ -4,7 +4,7 @@ import Link from "next/link";
 import axios from "axios";
 import { getCldImageUrl, getCldVideoUrl } from "next-cloudinary";
 import {
-  UploadIcon,
+  Shrink,
 } from "lucide-react";
 import { filesize } from "filesize";
 
@@ -110,21 +110,21 @@ export default function Home() {
           </p>
         </div>
         <Link href="/compress-media" className="btn btn-primary btn-sm rounded-xl gap-2">
-          <UploadIcon className="w-4 h-4" /> Compress Media
+          <Shrink className="w-4 h-4" /> Compress Media
         </Link>
       </div>
 
       {compressions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
           <div className="bg-base-200 rounded-full p-6">
-            <UploadIcon className="w-10 h-10 opacity-30" />
+            <Shrink className="w-10 h-10 opacity-30" />
           </div>
           <h2 className="text-lg font-semibold">No compressions yet</h2>
           <p className="text-sm opacity-50 max-w-sm">
             Compress an image, PDF, or video and it will appear here.
           </p>
           <Link href="/compress-media" className="btn btn-primary btn-sm rounded-xl gap-2 mt-2">
-            <UploadIcon className="w-4 h-4" /> Compress Media
+            <Shrink className="w-4 h-4" /> Compress Media
           </Link>
         </div>
       ) : (

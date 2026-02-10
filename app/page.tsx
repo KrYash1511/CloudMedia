@@ -6,13 +6,13 @@ import {
   ArrowRight,
   FileVideo,
   ImageIcon,
-  Repeat,
+  ArrowLeftRight,
   Sparkles,
   LayoutDashboard,
   Download,
   Lock,
   Shrink,
-  FileImage,
+  Crop,
 } from "lucide-react";
 
 export default function Home() {
@@ -105,12 +105,12 @@ export default function Home() {
               desc: "Shrink images, videos and PDFs. Set an exact target size or let our engine pick the best quality automatically.",
             },
             {
-              icon: Repeat,
+              icon: ArrowLeftRight,
               title: "Convert",
               desc: "Image format conversion, images to PDF, PDF to images, and video to audio — all in one place.",
             },
             {
-              icon: FileImage,
+              icon: Crop,
               title: "Resize Image",
               desc: "Resize and crop images to fit every major social platform in a single click.",
             },
@@ -202,7 +202,7 @@ export default function Home() {
                 desc: "Reduce image and PDF sizes with adjustable quality — great for email, web and print.",
               },
               {
-                icon: Repeat,
+                icon: ArrowLeftRight,
                 title: "Format Conversion",
                 desc: "Convert between PNG, JPG, WebP and more. Turn images into PDF or extract pages as images. Extract audio from video.",
               },

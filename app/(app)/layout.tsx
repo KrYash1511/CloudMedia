@@ -8,19 +8,19 @@ import {
   LogOutIcon,
   MenuIcon,
   LayoutDashboardIcon,
-  Share2Icon,
-  UploadIcon,
   CloudUpload,
-  Repeat,
+  Shrink,
+  Crop,
+  ArrowLeftRight,
   Sparkles,
   XIcon,
 } from "lucide-react";
 
 const sidebarItems = [
   { href: "/home", icon: LayoutDashboardIcon, label: "Dashboard" },
-  { href: "/compress-media", icon: UploadIcon, label: "Compress Media" },
-  { href: "/resize-image", icon: Share2Icon, label: "Resize Image" },
-  { href: "/convert", icon: Repeat, label: "Convert" },
+  { href: "/compress-media", icon: Shrink, label: "Compress Media" },
+  { href: "/resize-image", icon: Crop, label: "Resize Image" },
+  { href: "/convert", icon: ArrowLeftRight, label: "Convert" },
 ];
 
 const comingSoonItems = [
