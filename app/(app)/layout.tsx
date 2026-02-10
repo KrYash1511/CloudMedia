@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useClerk, useUser } from "@clerk/nextjs";
 import {
   LogOutIcon,
@@ -18,12 +18,12 @@ import {
 
 const sidebarItems = [
   { href: "/home", icon: LayoutDashboardIcon, label: "Dashboard" },
-  { href: "/video-upload", icon: UploadIcon, label: "Upload Video" },
+  { href: "/compress-media", icon: UploadIcon, label: "Compress Media" },
   { href: "/resize-image", icon: Share2Icon, label: "Resize Image" },
+  { href: "/convert", icon: Repeat, label: "Convert" },
 ];
 
 const comingSoonItems = [
-  { icon: Repeat, label: "Format Converter" },
   { icon: Sparkles, label: "Usage & Quota" },
 ];
 
@@ -34,7 +34,6 @@ export default function AppLayout({
 }>) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
 

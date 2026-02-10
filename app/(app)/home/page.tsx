@@ -2,61 +2,81 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import axios from "axios";
-import VideoCard from "@/components/VideoCard";
-import { Video } from "@/types";
+import { getCldImageUrl, getCldVideoUrl } from "next-cloudinary";
 import {
   UploadIcon,
-  VideoIcon,
-  HardDrive,
-  TrendingDown,
 } from "lucide-react";
 import { filesize } from "filesize";
 
 export default function Home() {
-  const [videos, setVideos] = useState<Video[]>([]);
+  const [compressions, setCompressions] = useState<any[]>([]);
+  const [compressionFilter, setCompressionFilter] = useState<
+    "all" | "video" | "pdf" | "images"
+  >("all");
+  const [hoveredPreviewId, setHoveredPreviewId] = useState<string | null>(null);
+  const [previewFailedById, setPreviewFailedById] = useState<Record<string, true>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchVideos = useCallback(async () => {
+  const getVideoThumbnailUrl = useCallback((publicId: string) => {
+    return getCldImageUrl({
+      src: publicId,
+      width: 560,
+      height: 315,
+      crop: "fill",
+      gravity: "auto",
+      format: "jpg",
+      quality: "auto",
+      assetType: "video",
+    });
+  }, []);
+
+  const getVideoHoverPreviewUrl = useCallback((publicId: string) => {
+    return getCldVideoUrl({
+      src: publicId,
+      width: 560,
+      height: 315,
+      rawTransformations: [
+        // Use the same transformation string as the previously working VideoCard
+        // (Cloudinary generates a short preview clip)
+        "e_preview:duration_15:max_seg_9:min_seg_dur_1",
+      ],
+    });
+  }, []);
+
+  const fetchCompressions = useCallback(async () => {
     try {
-      const response = await axios.get("/api/videos");
-      if (Array.isArray(response.data)) {
-        setVideos(response.data);
-      } else {
-        throw new Error("Invalid response format");
-      }
-    } catch (error) {
-      console.log(error);
-      setError("Failed to fetch videos");
+      const response = await axios.get("/api/compressions");
+      if (Array.isArray(response.data)) setCompressions(response.data);
+      else throw new Error("Invalid response format");
+    } catch (e) {
+      console.log(e);
+      setError("Failed to fetch compression history");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchVideos();
-  }, [fetchVideos]);
+    fetchCompressions();
+  }, [fetchCompressions]);
 
-  const handleDownload = useCallback((url: string, title: string) => {
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `${title}.mp4`);
-    link.setAttribute("target", "_blank");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadViaProxy = useCallback(async (remoteUrl: string, filename: string) => {
+    const proxyUrl =
+      "/api/download?" +
+      new URLSearchParams({ url: remoteUrl, filename }).toString();
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error("Download failed");
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(blobUrl);
   }, []);
-
-  /* ── Derived stats ───────────────────────────── */
-  const totalOriginal = videos.reduce(
-    (sum, v) => sum + Number(v.originalSize),
-    0
-  );
-  const totalCompressed = videos.reduce(
-    (sum, v) => sum + Number(v.compressedSize),
-    0
-  );
-  const totalSaved = totalOriginal - totalCompressed;
 
   /* ── Loading ─────────────────────────────────── */
   if (loading) {
@@ -72,7 +92,7 @@ export default function Home() {
     return (
       <div className="py-20 text-center space-y-3">
         <p className="text-lg font-semibold text-error">{error}</p>
-        <button className="btn btn-sm btn-outline" onClick={fetchVideos}>
+        <button className="btn btn-sm btn-outline" onClick={fetchCompressions}>
           Retry
         </button>
       </div>
@@ -86,71 +106,225 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm opacity-60 mt-1">
-            Your private media library &mdash; only you can see these.
+            Your compression history &mdash; only you can see these.
           </p>
         </div>
-        <Link href="/video-upload" className="btn btn-primary btn-sm rounded-xl gap-2">
-          <UploadIcon className="w-4 h-4" /> Upload Video
+        <Link href="/compress-media" className="btn btn-primary btn-sm rounded-xl gap-2">
+          <UploadIcon className="w-4 h-4" /> Compress Media
         </Link>
       </div>
 
-      {/* stat cards */}
-      {videos.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-base-200/60 rounded-2xl p-5 flex items-center gap-4">
-            <div className="bg-primary/10 text-primary rounded-xl p-2.5">
-              <VideoIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{videos.length}</p>
-              <p className="text-xs opacity-50">Videos</p>
-            </div>
-          </div>
-          <div className="bg-base-200/60 rounded-2xl p-5 flex items-center gap-4">
-            <div className="bg-secondary/10 text-secondary rounded-xl p-2.5">
-              <HardDrive className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">
-                {filesize(totalCompressed) as string}
-              </p>
-              <p className="text-xs opacity-50">Storage Used</p>
-            </div>
-          </div>
-          <div className="bg-base-200/60 rounded-2xl p-5 flex items-center gap-4">
-            <div className="bg-accent/10 text-accent rounded-xl p-2.5">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">
-                {filesize(totalSaved) as string}
-              </p>
-              <p className="text-xs opacity-50">Space Saved</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* empty state */}
-      {videos.length === 0 ? (
+      {compressions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
           <div className="bg-base-200 rounded-full p-6">
-            <VideoIcon className="w-10 h-10 opacity-30" />
+            <UploadIcon className="w-10 h-10 opacity-30" />
           </div>
-          <h2 className="text-lg font-semibold">No videos yet</h2>
+          <h2 className="text-lg font-semibold">No compressions yet</h2>
           <p className="text-sm opacity-50 max-w-sm">
-            Upload your first video and CloudMedia will automatically compress
-            it for you.
+            Compress an image, PDF, or video and it will appear here.
           </p>
-          <Link href="/video-upload" className="btn btn-primary btn-sm rounded-xl gap-2 mt-2">
-            <UploadIcon className="w-4 h-4" /> Upload Video
+          <Link href="/compress-media" className="btn btn-primary btn-sm rounded-xl gap-2 mt-2">
+            <UploadIcon className="w-4 h-4" /> Compress Media
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {videos.map((video) => (
-            <VideoCard key={video.id} video={video} onDownload={handleDownload} />
-          ))}
+        <div className="bg-base-200/40 border border-base-300/30 rounded-2xl p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
+                Compression History
+              </h2>
+              <p className="text-xs opacity-50 mt-1">
+                Hover videos to see a 10s preview.
+              </p>
+            </div>
+            <Link href="/compress-media" className="btn btn-ghost btn-sm rounded-xl">
+              New
+            </Link>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {([
+              { key: "all", label: "All" },
+              { key: "video", label: "Video" },
+              { key: "pdf", label: "PDF" },
+              { key: "images", label: "Images" },
+            ] as const).map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setCompressionFilter(f.key)}
+                className={`btn btn-sm rounded-xl ${
+                  compressionFilter === f.key ? "btn-primary" : "btn-ghost"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {compressions
+              .filter((c) => {
+                if (compressionFilter === "all") return true;
+                const rt = String(c?.asset?.resourceType || "");
+                const fmt = String(c?.asset?.originalFormat || "");
+                if (compressionFilter === "video") return rt === "video";
+                if (compressionFilter === "pdf") return rt === "image" && fmt === "pdf";
+                return rt === "image" && fmt !== "pdf";
+              })
+              .map((c) => {
+              const publicId: string | undefined = c?.asset?.publicId;
+              const name = publicId?.split("/")?.pop() || "asset";
+              const opts = c?.options || {};
+              const originalBytes = Number(opts?.originalBytes ?? 0);
+              const achievedBytes = Number(opts?.achievedBytes ?? 0);
+              const saved = originalBytes > 0 && achievedBytes > 0 ? originalBytes - achievedBytes : 0;
+              const percent =
+                originalBytes > 0 && achievedBytes > 0
+                  ? Math.max(0, Math.min(100, Math.round((saved / originalBytes) * 100)))
+                  : null;
+              const url: string | undefined = c?.resultUrl;
+              const createdAt = c?.createdAt ? new Date(c.createdAt) : null;
+
+              const rt = String(c?.asset?.resourceType || "");
+              const fmt = String(c?.asset?.originalFormat || "");
+              const previewKind: "video" | "pdf" | "image" | "none" = !url
+                ? "none"
+                : rt === "video"
+                  ? "video"
+                  : fmt === "pdf"
+                    ? "pdf"
+                    : "image";
+
+              const isHovered = hoveredPreviewId === c.id;
+              const previewFailed = Boolean(previewFailedById[c.id]);
+
+              return (
+                <div
+                  key={c.id}
+                  className="group bg-base-100 border border-base-300/30 rounded-2xl overflow-hidden"
+                >
+                  <div
+                    className="aspect-video bg-base-300/30 relative"
+                    onPointerEnter={() => previewKind === "video" && setHoveredPreviewId(c.id)}
+                    onPointerLeave={() => setHoveredPreviewId(null)}
+                    onMouseEnter={() => previewKind === "video" && setHoveredPreviewId(c.id)}
+                    onMouseLeave={() => setHoveredPreviewId(null)}
+                  >
+                    {previewKind === "none" ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-xs opacity-40">No preview</span>
+                      </div>
+                    ) : previewKind === "image" ? (
+                      <img
+                        src={url}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : previewKind === "pdf" ? (
+                      <embed
+                        src={url}
+                        type="application/pdf"
+                        className="w-full h-full"
+                      />
+                    ) : publicId ? (
+                      isHovered ? (
+                        previewFailed ? (
+                          <video
+                            className="w-full h-full object-cover"
+                            controls
+                            preload="metadata"
+                          >
+                            <source src={url} />
+                          </video>
+                        ) : (
+                          <video
+                            src={getVideoHoverPreviewUrl(publicId)}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            preload="metadata"
+                            poster={getVideoThumbnailUrl(publicId)}
+                            className="w-full h-full object-cover"
+                            onError={() =>
+                              setPreviewFailedById((prev) => ({ ...prev, [c.id]: true }))
+                            }
+                          />
+                        )
+                      ) : (
+                        <img
+                          src={getVideoThumbnailUrl(publicId)}
+                          alt="Video thumbnail"
+                          className="w-full h-full object-cover"
+                        />
+                      )
+                    ) : (
+                      <video
+                        className="w-full h-full object-cover"
+                        controls
+                        preload="metadata"
+                      >
+                        <source src={url} />
+                      </video>
+                    )}
+
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <span className="badge badge-ghost badge-sm">
+                        {previewKind === "video" ? "Video" : previewKind === "pdf" ? "PDF" : previewKind === "image" ? "Image" : "File"}
+                      </span>
+                      {percent != null && (
+                        <span className="badge badge-primary badge-sm">
+                          {percent}% smaller
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{name}</p>
+                      <p className="text-xs opacity-60 mt-0.5">
+                        {originalBytes ? `${filesize(originalBytes) as string} → ` : ""}
+                        {achievedBytes ? `${filesize(achievedBytes) as string}` : "—"}
+                        {saved > 0 ? ` (saved ${filesize(saved) as string})` : ""}
+                      </p>
+                      {createdAt && (
+                        <p className="text-xs opacity-50 mt-1">
+                          {createdAt.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 justify-end">
+                      {url && (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-outline btn-sm rounded-xl"
+                        >
+                          Open
+                        </a>
+                      )}
+                      {url && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm rounded-xl"
+                          onClick={() =>
+                            void downloadViaProxy(url, `${name}.${c?.targetFormat || "bin"}`)
+                          }
+                        >
+                          Download
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Download,
   Lock,
+  Shrink,
+  FileImage,
 } from "lucide-react";
 
 export default function Home() {
@@ -56,14 +58,14 @@ export default function Home() {
           <span className="badge-soon mb-6 inline-flex">Beta &middot; Free to use</span>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight mb-6">
-            Cloud-Based Media Processing,{" "}
-            <span className="gradient-text">Made Simple</span>
+            Compress, Convert &amp; Resize{" "}
+            <span className="gradient-text">All Your Media</span>
           </h1>
 
           <p className="max-w-2xl mx-auto text-lg md:text-xl opacity-75 leading-relaxed mb-10">
-            Upload your videos to the cloud, get them compressed automatically,
-            and download optimized versions from your private dashboard &mdash;
-            no heavy desktop software required.
+            A cloud-powered toolkit for images, videos and PDFs. Compress to any
+            target size, convert between formats, resize for social platforms
+            &mdash; all from your browser with zero installs.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -86,44 +88,43 @@ export default function Home() {
 
       <div className="section-divider mx-auto w-4/5" />
 
-      {/* ── How it works ───────────────────────────────────── */}
+      {/* ── Core tools ─────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-5 py-20 lg:py-28">
         <p className="text-center text-sm font-semibold uppercase tracking-widest text-primary mb-3">
-          How it works
+          What you can do
         </p>
         <h2 className="text-3xl lg:text-4xl font-bold text-center mb-14">
-          Three steps to lighter media
+          Four tools, one platform
         </h2>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             {
-              step: "01",
-              icon: CloudUpload,
-              title: "Upload",
-              desc: "Drag-and-drop or browse for any video file up to 70 MB. We handle the rest in the cloud.",
+              icon: Shrink,
+              title: "Compress Media",
+              desc: "Shrink images, videos and PDFs. Set an exact target size or let our engine pick the best quality automatically.",
             },
             {
-              step: "02",
-              icon: Zap,
-              title: "Compress",
-              desc: "Our engine optimises your media automatically — smaller file size, same visual quality.",
+              icon: Repeat,
+              title: "Convert",
+              desc: "Image format conversion, images to PDF, PDF to images, and video to audio — all in one place.",
             },
             {
-              step: "03",
-              icon: Download,
-              title: "Download",
-              desc: "Grab the compressed version from your private dashboard. Only you can access your files.",
+              icon: FileImage,
+              title: "Resize Image",
+              desc: "Resize and crop images to fit every major social platform in a single click.",
+            },
+            {
+              icon: LayoutDashboard,
+              title: "Dashboard",
+              desc: "View your full compression history, preview results with video hover playback, and download anytime.",
             },
           ].map((item) => (
             <div
-              key={item.step}
+              key={item.title}
               className="card-hover rounded-2xl border border-base-300/60 bg-base-200/40 p-8"
             >
-              <span className="text-5xl font-black opacity-10 leading-none">
-                {item.step}
-              </span>
-              <item.icon className="w-8 h-8 text-primary mt-4 mb-3" />
+              <item.icon className="w-9 h-9 text-primary mb-4" />
               <h3 className="text-lg font-bold mb-2">{item.title}</h3>
               <p className="opacity-70 text-sm leading-relaxed">{item.desc}</p>
             </div>
@@ -131,28 +132,79 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Features grid ──────────────────────────────────── */}
+      {/* ── How it works ───────────────────────────────────── */}
       <section className="bg-base-200/50 py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-5">
           <p className="text-center text-sm font-semibold uppercase tracking-widest text-primary mb-3">
-            Platform features
+            How it works
           </p>
           <h2 className="text-3xl lg:text-4xl font-bold text-center mb-14">
-            Everything you need for cloud media
+            Three steps to optimised media
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "01",
+                icon: CloudUpload,
+                title: "Upload",
+                desc: "Pick any image, video or PDF (up to 100 MB for video). We handle the rest in the cloud.",
+              },
+              {
+                step: "02",
+                icon: Zap,
+                title: "Process",
+                desc: "Compress, convert or resize — choose your tool and optionally set a target size. Processing happens on fast cloud servers.",
+              },
+              {
+                step: "03",
+                icon: Download,
+                title: "Download",
+                desc: "Grab the result instantly. All files are tied to your private account — only you can see them.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="card-hover rounded-2xl border border-base-300/60 bg-base-100 p-8"
+              >
+                <span className="text-5xl font-black opacity-10 leading-none">
+                  {item.step}
+                </span>
+                <item.icon className="w-8 h-8 text-primary mt-4 mb-3" />
+                <h3 className="text-lg font-bold mb-2">{item.title}</h3>
+                <p className="opacity-70 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features grid ──────────────────────────────────── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-6xl mx-auto px-5">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-primary mb-3">
+            Platform highlights
+          </p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-center mb-14">
+            Why CloudMedia?
           </h2>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Current features */}
             {[
               {
                 icon: FileVideo,
                 title: "Video Compression",
-                desc: "Reduce video file sizes dramatically while preserving visual quality.",
+                desc: "Target a specific file size or let best-quality mode choose the optimal bitrate automatically.",
               },
               {
                 icon: ImageIcon,
-                title: "Image Resizer",
-                desc: "Resize and crop images for every social platform in one click.",
+                title: "Image & PDF Compression",
+                desc: "Reduce image and PDF sizes with adjustable quality — great for email, web and print.",
+              },
+              {
+                icon: Repeat,
+                title: "Format Conversion",
+                desc: "Convert between PNG, JPG, WebP and more. Turn images into PDF or extract pages as images. Extract audio from video.",
               },
               {
                 icon: Lock,
@@ -160,14 +212,14 @@ export default function Home() {
                 desc: "Every file is tied to your account. Nobody else can see or download your media.",
               },
               {
-                icon: LayoutDashboard,
-                title: "Personal Dashboard",
-                desc: "View, manage, and download all your compressed files in one place.",
-              },
-              {
                 icon: Shield,
                 title: "Cloud-Powered",
-                desc: "Processing happens on fast cloud servers — no CPU load on your machine.",
+                desc: "Processing happens on fast cloud servers — zero CPU load on your machine.",
+              },
+              {
+                icon: Sparkles,
+                title: "Compression History",
+                desc: "Your dashboard tracks every compression with size stats, preview thumbnails and hover video playback.",
               },
             ].map((f) => (
               <div
@@ -179,43 +231,13 @@ export default function Home() {
                 <p className="text-sm opacity-70 leading-relaxed">{f.desc}</p>
               </div>
             ))}
-
-            {/* Future-feature placeholders */}
-            {[
-              {
-                icon: Repeat,
-                title: "Format Conversion",
-                desc: "Convert between MP4, WebM, AVI, MOV and more — directly in the browser.",
-                soon: true,
-              },
-              {
-                icon: Sparkles,
-                title: "Free Tier & Usage Tracking",
-                desc: "Track your monthly usage and enjoy generous free-tier limits.",
-                soon: true,
-              },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="card-hover rounded-2xl border border-dashed border-base-300 bg-base-100/50 p-7 relative"
-              >
-                <span className="badge-soon absolute top-4 right-4">
-                  Coming Soon
-                </span>
-                <f.icon className="w-9 h-9 text-base-content/30 mb-4" />
-                <h3 className="font-bold text-base mb-1 opacity-60">
-                  {f.title}
-                </h3>
-                <p className="text-sm opacity-40 leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
       <div className="section-divider mx-auto w-4/5" />
 
-      {/* ── About / Project description ────────────────────── */}
+      {/* ── About ──────────────────────────────────────────── */}
       <section className="max-w-4xl mx-auto px-5 py-20 lg:py-28 text-center">
         <p className="text-sm font-semibold uppercase tracking-widest text-primary mb-3">
           About the platform
@@ -224,15 +246,12 @@ export default function Home() {
           Why CloudMedia exists
         </h2>
         <p className="text-base md:text-lg opacity-70 leading-relaxed max-w-3xl mx-auto">
-          CloudMedia is a Cloudinary-based SaaS platform where users first visit
-          a public landing page to understand the service, then sign up or log
-          in to upload videos. Uploaded videos are stored and compressed using
-          Cloudinary, and the compressed links are saved in a database along with
-          the user&rsquo;s ID. Inside the private dashboard, users can view and
-          download only their own uploaded and compressed videos, ensuring data
-          privacy and security. The main goal is to provide an easy cloud-based
-          media compression service without requiring users to install heavy
-          tools locally.
+          CloudMedia is a Cloudinary-powered SaaS toolkit for everyday media
+          tasks. Sign up, upload an image, video or PDF, and compress it to a
+          target size — or let the engine choose the best quality for you.
+          Convert between formats, resize images for social platforms, and track
+          every result in your private dashboard. No heavy desktop software, no
+          CLI tools — just a browser.
         </p>
       </section>
 
@@ -240,11 +259,11 @@ export default function Home() {
       <section className="bg-primary/5 py-20 lg:py-24">
         <div className="max-w-3xl mx-auto px-5 text-center">
           <h2 className="text-3xl lg:text-4xl font-bold mb-5">
-            Ready to lighten your media?
+            Ready to optimise your media?
           </h2>
           <p className="text-lg opacity-70 mb-8">
-            Create a free account and start compressing in under a minute. No
-            credit card required.
+            Create a free account and start compressing, converting and resizing
+            in under a minute. No credit card required.
           </p>
           <Link
             href="/sign-up"

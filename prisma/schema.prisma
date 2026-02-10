@@ -21,3 +21,41 @@ model Video {
 
   @@index([userId])
 }
+// ...existing code...
+
+model MediaAsset {
+  id             String   @id @default(cuid())
+  userId         String
+  publicId       String
+  resourceType   String   // "image" | "video"
+  mimeType       String?
+  originalFormat String
+  bytes          Int
+  width          Int?
+  height         Int?
+  duration       Float?
+  pages          Int?     // for PDFs if you later store it
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversions    Conversion[]
+
+  @@index([userId])
+  @@unique([userId, publicId])
+}
+
+model Conversion {
+  id           String   @id @default(cuid())
+  userId       String
+  assetId      String
+  kind         String   // e.g. "image_format" | "image_to_pdf" | "pdf_to_image" | "video_to_audio"
+  targetFormat String
+  options      Json?
+  resultUrl    String
+  createdAt    DateTime @default(now())
+
+  asset        MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([assetId])
+}

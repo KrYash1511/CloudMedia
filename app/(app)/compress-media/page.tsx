@@ -1,198 +1,399 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { CldImage } from "next-cloudinary";
-import { ImageUp, Download, Sparkles } from "lucide-react";
 
-const socialFormats = {
-  "Instagram Square (1:1)": { width: 1080, height: 1080, aspectRatio: "1:1" },
-  "Instagram Portrait (4:5)": { width: 1080, height: 1350, aspectRatio: "4:5" },
-  "Twitter Post (16:9)": { width: 1200, height: 675, aspectRatio: "16:9" },
-  "Twitter Header (3:1)": { width: 1500, height: 500, aspectRatio: "3:1" },
-  "Facebook Cover (205:78)": { width: 820, height: 312, aspectRatio: "205:78" },
+import React, { useMemo, useRef, useState } from "react";
+import { Download, Sparkles } from "lucide-react";
+
+type UploadedAsset = {
+  assetId: string;
+  publicId: string;
+  resourceType: "image" | "video";
+  originalFormat: string;
+  bytes: number;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
 };
 
-type SocialFormatKey = keyof typeof socialFormats;
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+  const units = ["B", "KB", "MB", "GB"];
+  let idx = 0;
+  let value = bytes;
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024;
+    idx += 1;
+  }
+  return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+}
 
-export default function SocialShare() {
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [selectedFormat, setSelectedFormat] =
-    useState<SocialFormatKey>("Instagram Square (1:1)");
+function downloadBlob(blob: Blob, filename: string) {
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
+async function downloadViaProxy(remoteUrl: string, filename: string) {
+  const proxyUrl =
+    "/api/download?" +
+    new URLSearchParams({ url: remoteUrl, filename }).toString();
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error("Download failed");
+  const blob = await res.blob();
+  downloadBlob(blob, filename);
+}
+
+export default function CompressMediaPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  type MediaKind = "photo" | "pdf" | "video";
+  const [mediaKind, setMediaKind] = useState<MediaKind>("photo");
+
+  const [asset, setAsset] = useState<UploadedAsset | null>(null);
+  const [useTargetSize, setUseTargetSize] = useState(true);
+  const [targetUnit, setTargetUnit] = useState<"mb" | "kb">("mb");
+  const [targetValue, setTargetValue] = useState<number>(5);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [beforeBytes, setBeforeBytes] = useState<number | null>(null);
+  const [afterBytes, setAfterBytes] = useState<number | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+
   const [isUploading, setIsUploading] = useState(false);
-  const [isTransforming, setIsTransforming] = useState(false);
-  const [transformedUrl, setTransformedUrl] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (uploadedImage) {
-      setIsTransforming(true);
-      setTransformedUrl(null);
+  const previewType = useMemo<"image" | "video" | "pdf" | "none">(() => {
+    if (!asset || !resultUrl) return "none";
+    if (asset.resourceType === "video") return "video";
+    if (asset.originalFormat === "pdf") return "pdf";
+    return "image";
+  }, [asset, resultUrl]);
+
+  const uploadAccept = useMemo(() => {
+    if (mediaKind === "photo") return "image/*";
+    if (mediaKind === "pdf") return "application/pdf";
+    return "video/*";
+  }, [mediaKind]);
+
+  const downloadName = useMemo(() => {
+    const base = asset?.publicId?.split("/")?.pop() || "compressed";
+    const ext = asset?.originalFormat || "bin";
+    return `${base}.${ext}`;
+  }, [asset?.publicId, asset?.originalFormat]);
+
+  const handleUpload = async (file: File) => {
+    if (mediaKind === "photo" && !file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
     }
-  }, [selectedFormat, uploadedImage]);
+    if (mediaKind === "pdf" && file.type !== "application/pdf") {
+      setError("Please choose a PDF file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (mediaKind === "video" && !file.type.startsWith("video/")) {
+      setError("Please choose a video file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
+    setError(null);
+    setResultUrl(null);
+    setWarning(null);
+    setBeforeBytes(null);
+    setAfterBytes(null);
     try {
-      const response = await fetch("/api/image-upload", {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/assets/upload", {
         method: "POST",
-        body: formData,
+        body: form,
       });
-      if (!response.ok) throw new Error("Upload failed");
-      const data = await response.json();
-      setUploadedImage(data.publicId);
-    } catch (error) {
-      console.error(error);
-      alert("Image upload failed. Please try again.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Upload failed");
+      setAsset(data as UploadedAsset);
+      setBeforeBytes((data as UploadedAsset).bytes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDownload = () => {
-    if (!transformedUrl) return;
-    fetch(transformedUrl)
-      .then((r) => r.blob())
-      .then((blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download =
-          `${selectedFormat}`.replace(/\s/g, "_").toLowerCase() + ".png";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+  const handleCompress = async () => {
+    if (!asset) return;
+    setIsCompressing(true);
+    setError(null);
+    setWarning(null);
+    setResultUrl(null);
+    try {
+      const payload: any = { assetId: asset.assetId };
+      if (useTargetSize) {
+        if (targetUnit === "kb") payload.targetKb = targetValue;
+        else payload.targetMb = targetValue;
+      }
+
+      const res = await fetch("/api/compress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Compression failed");
+      setResultUrl(String(data.resultUrl));
+      setBeforeBytes(Number(data.originalBytes ?? beforeBytes ?? 0));
+      setAfterBytes(Number(data.bytes ?? 0));
+      setWarning(typeof data.warning === "string" ? data.warning : null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Compression failed");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* header */}
+    <div className="max-w-6xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Social Share</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Compress Media</h1>
         <p className="text-sm opacity-60 mt-1">
-          Resize images for every social platform in one click.
+          Choose a media type, set a target size (KB/MB), and compress.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ── Left column: controls ───────────────── */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* upload card */}
-          <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
-              1 &middot; Upload Image
-            </h2>
-            <label
-              className={`flex flex-col items-center gap-3 border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-colors ${
-                uploadedImage
-                  ? "border-primary/50 bg-primary/5"
-                  : "border-base-300 hover:border-primary/40 hover:bg-base-300/30"
+      <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-3">
+        <div className="flex flex-wrap gap-2">
+          {([
+            { key: "photo", label: "Photo" },
+            { key: "pdf", label: "PDF" },
+            { key: "video", label: "Video" },
+          ] as const).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                setMediaKind(item.key);
+                setError(null);
+                setWarning(null);
+                setResultUrl(null);
+                setBeforeBytes(null);
+                setAfterBytes(null);
+                setAsset(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className={`btn btn-sm rounded-xl ${
+                mediaKind === item.key ? "btn-primary" : "btn-ghost"
               }`}
             >
-              <ImageUp
-                className={`w-8 h-8 ${
-                  uploadedImage ? "text-primary" : "opacity-30"
-                }`}
-              />
-              <p className="text-sm opacity-50">
-                {uploadedImage
-                  ? "Image uploaded — click to replace"
-                  : "Click to choose an image"}
-              </p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {isUploading && (
-              <progress className="progress progress-primary w-full" />
+      {error && (
+        <div className="alert alert-error rounded-2xl">
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
+      {warning && (
+        <div className="alert rounded-2xl">
+          <span className="text-sm">{warning}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
+              1 &middot; Upload
+            </h2>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={uploadAccept}
+              className="file-input file-input-bordered w-full rounded-xl"
+              disabled={isUploading || isCompressing}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUpload(f);
+              }}
+            />
+            {isUploading && <progress className="progress progress-primary w-full" />}
+
+            {asset && (
+              <div className="bg-base-100 border border-base-300/30 rounded-2xl p-4 text-sm space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="opacity-60">Type</span>
+                  <span className="font-semibold">{asset.resourceType}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="opacity-60">Format</span>
+                  <span className="font-semibold">{asset.originalFormat}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="opacity-60">Size</span>
+                  <span className="font-semibold">{formatBytes(asset.bytes)}</span>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* format selector */}
-          {uploadedImage && (
-            <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
-                2 &middot; Choose Format
-              </h2>
-              <div className="space-y-2">
-                {Object.keys(socialFormats).map((format) => (
-                  <button
-                    key={format}
-                    onClick={() =>
-                      setSelectedFormat(format as SocialFormatKey)
-                    }
-                    className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                      selectedFormat === format
-                        ? "bg-primary text-primary-content"
-                        : "hover:bg-base-300/60"
-                    }`}
-                  >
-                    {format}
-                  </button>
-                ))}
-              </div>
+          <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
+              2 &middot; Target Size
+            </h2>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={useTargetSize}
+                onChange={(e) => setUseTargetSize(e.target.checked)}
+                disabled={isCompressing}
+              />
+              <span className="font-medium">Set target size</span>
+            </label>
+
+            <label className="text-xs font-semibold opacity-60">
+              Max size ({targetUnit.toUpperCase()})
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={targetUnit === "mb" ? 0.5 : 50}
+                max={targetUnit === "mb" ? 100 : 102400}
+                step={targetUnit === "mb" ? 0.5 : 50}
+                value={Number.isFinite(targetValue) ? targetValue : 5}
+                onChange={(e) => setTargetValue(Number(e.target.value))}
+                className="input input-bordered w-full rounded-xl"
+                disabled={isCompressing || !useTargetSize}
+              />
+              <select
+                className="select select-bordered rounded-xl"
+                value={targetUnit}
+                disabled={isCompressing || !useTargetSize}
+                onChange={(e) => {
+                  const next = e.target.value as "mb" | "kb";
+                  if (next === targetUnit) return;
+
+                  // Keep the number roughly equivalent when switching units.
+                  if (next === "kb") {
+                    setTargetValue((v) => Math.max(1, Math.round(v * 1024)));
+                  } else {
+                    setTargetValue((v) => Math.max(0.5, Number((v / 1024).toFixed(2))));
+                  }
+                  setTargetUnit(next);
+                }}
+              >
+                <option value="mb">MB</option>
+                <option value="kb">KB</option>
+              </select>
             </div>
-          )}
+
+            {!useTargetSize && (
+              <p className="text-xs opacity-60">
+                Target size is off — compression will use best-quality settings.
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-primary w-full rounded-xl"
+              onClick={() => void handleCompress()}
+              disabled={!asset || isCompressing}
+            >
+              {isCompressing ? "Compressing…" : "Compress"}
+            </button>
+
+            {(beforeBytes != null || afterBytes != null) && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-base-100 border border-base-300/30 rounded-2xl p-4">
+                  <p className="text-xs opacity-60">Before</p>
+                  <p className="text-sm font-bold">
+                    {beforeBytes != null ? formatBytes(beforeBytes) : "—"}
+                  </p>
+                </div>
+                <div className="bg-base-100 border border-base-300/30 rounded-2xl p-4">
+                  <p className="text-xs opacity-60">After</p>
+                  <p className="text-sm font-bold">
+                    {afterBytes != null ? formatBytes(afterBytes) : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ── Right column: preview ───────────────── */}
         <div className="lg:col-span-3">
-          {!uploadedImage ? (
-            <div className="flex flex-col items-center justify-center h-full py-20 text-center space-y-3 bg-base-200/30 rounded-2xl border border-base-300/30">
-              <Sparkles className="w-8 h-8 opacity-20" />
-              <p className="text-sm opacity-40">
-                Upload an image to see the preview here.
-              </p>
-            </div>
-          ) : (
-            <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
-                Preview
-              </h2>
-              <div className="relative flex justify-center">
-                {isTransforming && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-base-100/60 z-10 rounded-xl">
-                    <span className="loading loading-spinner loading-lg text-primary" />
-                  </div>
-                )}
-                <CldImage
-                  width={socialFormats[selectedFormat].width}
-                  height={socialFormats[selectedFormat].height}
-                  src={uploadedImage}
-                  sizes="100vw"
-                  alt="transformed image"
-                  crop="fill"
-                  aspectRatio={socialFormats[selectedFormat].aspectRatio}
-                  gravity="auto"
-                  className="rounded-xl max-h-[500px] w-auto"
-                  onLoad={(e) => {
-                    setIsTransforming(false);
-                    setTransformedUrl(
-                      e.currentTarget.currentSrc || e.currentTarget.src
-                    );
-                  }}
-                />
+          <div className="bg-base-200/50 border border-base-300/40 rounded-2xl p-6 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide opacity-50">
+              Result
+            </h2>
+
+            {!resultUrl ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 bg-base-200/30 rounded-2xl border border-base-300/30">
+                <Sparkles className="w-8 h-8 opacity-20" />
+                <p className="text-sm opacity-40">
+                  Compress a file to see the preview here.
+                </p>
               </div>
-              <button
-                className="btn btn-primary w-full rounded-xl gap-2"
-                onClick={handleDownload}
-                disabled={!transformedUrl}
-              >
-                <Download className="w-4 h-4" />
-                Download for {selectedFormat}
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="space-y-4">
+                {previewType === "image" && (
+                  <img
+                    src={resultUrl}
+                    alt="Compressed result"
+                    className="w-full rounded-xl border border-base-300/30"
+                  />
+                )}
+
+                {previewType === "video" && (
+                  <video controls className="w-full rounded-xl border border-base-300/30">
+                    <source src={resultUrl} />
+                  </video>
+                )}
+
+                {previewType === "pdf" && (
+                  <embed
+                    src={resultUrl}
+                    type="application/pdf"
+                    className="w-full rounded-xl border border-base-300/30"
+                    style={{ height: "480px" }}
+                  />
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-primary w-full rounded-xl gap-2"
+                  disabled={isDownloading}
+                  onClick={async () => {
+                    if (!resultUrl) return;
+                    setIsDownloading(true);
+                    setError(null);
+                    try {
+                      await downloadViaProxy(resultUrl, downloadName);
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Download failed");
+                    } finally {
+                      setIsDownloading(false);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  {isDownloading ? "Downloading…" : "Download"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
