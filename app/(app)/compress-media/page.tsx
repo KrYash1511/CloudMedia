@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Sparkles } from "lucide-react";
 import { authFetch, authHeaders } from "@/lib/api-client";
 
@@ -51,11 +51,17 @@ async function downloadViaProxy(remoteUrl: string, filename: string) {
 
 export default function CompressMediaPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   type MediaKind = "photo" | "pdf" | "video";
   const [mediaKind, setMediaKind] = useState<MediaKind>("photo");
 
   const [asset, setAsset] = useState<UploadedAsset | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [useTargetSize, setUseTargetSize] = useState(true);
   const [targetUnit, setTargetUnit] = useState<"mb" | "kb">("mb");
   const [targetValue, setTargetValue] = useState<number>(5);
@@ -68,13 +74,19 @@ export default function CompressMediaPage() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resultFormat, setResultFormat] = useState<string | null>(null);
+  const [resultResourceType, setResultResourceType] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   const previewType = useMemo<"image" | "video" | "pdf" | "none">(() => {
-    if (!asset || !resultUrl) return "none";
-    if (asset.resourceType === "video") return "video";
-    if (asset.originalFormat === "pdf") return "pdf";
+    if (!resultUrl) return "none";
+    // Use the format/resourceType returned from the compress API
+    if (resultResourceType === "video") return "video";
+    if (resultFormat === "pdf" || resultUrl.endsWith(".pdf")) return "pdf";
+    if (asset?.resourceType === "video") return "video";
+    if (asset?.originalFormat === "pdf") return "pdf";
     return "image";
-  }, [asset, resultUrl]);
+  }, [asset, resultUrl, resultFormat, resultResourceType]);
 
   const uploadAccept = useMemo(() => {
     if (mediaKind === "photo") return "image/*";
@@ -84,9 +96,9 @@ export default function CompressMediaPage() {
 
   const downloadName = useMemo(() => {
     const base = asset?.publicId?.split("/")?.pop() || "compressed";
-    const ext = asset?.originalFormat || "bin";
+    const ext = resultFormat || asset?.originalFormat || "bin";
     return `${base}.${ext}`;
-  }, [asset?.publicId, asset?.originalFormat]);
+  }, [asset?.publicId, asset?.originalFormat, resultFormat]);
 
   const handleUpload = async (file: File) => {
     if (mediaKind === "photo" && !file.type.startsWith("image/")) {
@@ -111,6 +123,7 @@ export default function CompressMediaPage() {
     setWarning(null);
     setBeforeBytes(null);
     setAfterBytes(null);
+    setPdfFile(null);
     try {
       const form = new FormData();
       form.append("file", file);
@@ -122,6 +135,8 @@ export default function CompressMediaPage() {
       if (!res.ok) throw new Error(data?.error || "Upload failed");
       setAsset(data as UploadedAsset);
       setBeforeBytes((data as UploadedAsset).bytes);
+      // Keep the raw PDF file for Ghostscript compression
+      if (mediaKind === "pdf") setPdfFile(file);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -131,25 +146,76 @@ export default function CompressMediaPage() {
 
   const handleCompress = async () => {
     if (!asset) return;
+
+    // Client-side validation: target size must be less than original
+    if (useTargetSize && asset.bytes > 0) {
+      const targetInBytes =
+        targetUnit === "kb" ? targetValue * 1024 : targetValue * 1024 * 1024;
+      if (targetInBytes >= asset.bytes) {
+        setError(
+          `Target size must be smaller than the original file size (${formatBytes(asset.bytes)}).`
+        );
+        return;
+      }
+    }
+
     setIsCompressing(true);
     setError(null);
     setWarning(null);
     setResultUrl(null);
+    setResultFormat(null);
+    setResultResourceType(null);
     try {
-      const payload: any = { assetId: asset.assetId };
-      if (useTargetSize) {
-        if (targetUnit === "kb") payload.targetKb = targetValue;
-        else payload.targetMb = targetValue;
-      }
+      let res: Response;
 
-      const res = await authFetch("/api/compress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (mediaKind === "pdf" && pdfFile) {
+        // PDF: send raw file as FormData so the server can compress with Ghostscript
+        const form = new FormData();
+        form.append("file", pdfFile);
+        form.append("assetId", asset.assetId);
+        if (useTargetSize) {
+          if (targetUnit === "kb") form.append("targetKb", String(targetValue));
+          else form.append("targetMb", String(targetValue));
+        }
+        res = await authFetch("/api/compress", {
+          method: "POST",
+          body: form,
+        });
+      } else {
+        // Image / Video: send JSON
+        const payload: any = { assetId: asset.assetId };
+        if (useTargetSize) {
+          if (targetUnit === "kb") payload.targetKb = targetValue;
+          else payload.targetMb = targetValue;
+        }
+        res = await authFetch("/api/compress", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Compression failed");
-      setResultUrl(String(data.resultUrl));
+
+      // For PDFs: create a blob URL from base64 data for reliable preview/download
+      if (data.pdfBase64) {
+        const byteChars = atob(data.pdfBase64);
+        const byteArray = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteArray[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+        // Revoke previous blob URL if any
+        if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(blobUrl);
+        setResultUrl(blobUrl);
+      } else {
+        setResultUrl(String(data.resultUrl));
+      }
+
+      setResultFormat(data.format ?? null);
+      setResultResourceType(data.resourceType ?? null);
       setBeforeBytes(Number(data.originalBytes ?? beforeBytes ?? 0));
       setAfterBytes(Number(data.bytes ?? 0));
       setWarning(typeof data.warning === "string" ? data.warning : null);
@@ -160,6 +226,10 @@ export default function CompressMediaPage() {
       setIsCompressing(false);
     }
   };
+
+  if (!isMounted) {
+    return <div className="max-w-6xl mx-auto" suppressHydrationWarning />;
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -185,9 +255,13 @@ export default function CompressMediaPage() {
                 setError(null);
                 setWarning(null);
                 setResultUrl(null);
+                setResultFormat(null);
+                setResultResourceType(null);
                 setBeforeBytes(null);
                 setAfterBytes(null);
                 setAsset(null);
+                setPdfFile(null);
+                if (pdfBlobUrl) { URL.revokeObjectURL(pdfBlobUrl); setPdfBlobUrl(null); }
                 if (fileInputRef.current) fileInputRef.current.value = "";
               }}
               className={`btn btn-sm rounded-xl ${
@@ -365,11 +439,11 @@ export default function CompressMediaPage() {
                 )}
 
                 {previewType === "pdf" && (
-                  <embed
+                  <iframe
                     src={resultUrl}
-                    type="application/pdf"
                     className="w-full rounded-xl border border-base-300/30"
                     style={{ height: "480px" }}
+                    title="Compressed PDF preview"
                   />
                 )}
 
@@ -382,7 +456,14 @@ export default function CompressMediaPage() {
                     setIsDownloading(true);
                     setError(null);
                     try {
-                      await downloadViaProxy(resultUrl, downloadName);
+                      if (pdfBlobUrl && resultUrl === pdfBlobUrl) {
+                        // PDF: download directly from blob (no proxy needed)
+                        const res = await fetch(pdfBlobUrl);
+                        const blob = await res.blob();
+                        downloadBlob(blob, downloadName);
+                      } else {
+                        await downloadViaProxy(resultUrl, downloadName);
+                      }
                     } catch (e) {
                       setError(e instanceof Error ? e.message : "Download failed");
                     } finally {
