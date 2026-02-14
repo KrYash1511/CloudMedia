@@ -29,18 +29,52 @@ function clampNumber(value: number, min: number, max: number) {
 
 // ── Ghostscript helpers ──
 
-function findGsBinary(): string {
+function getGhostscriptCandidates(): string[] {
+  const fromEnv = process.env.GS_BINARY?.trim();
+
   if (process.platform === "win32") {
-    // Common Windows install paths
-    const paths = [
+    const candidates = [
       "C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe",
       "C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe",
+      "C:\\Program Files\\gs\\gs10.02.1\\bin\\gswin64c.exe",
       "C:\\Program Files (x86)\\gs\\gs10.04.0\\bin\\gswin32c.exe",
+      "gswin64c.exe",
+      "gswin32c.exe",
+      "gs",
     ];
-    // Also try bare command name (if in PATH)
-    return paths[0]; // Will error at runtime if not found
+    return fromEnv ? [fromEnv, ...candidates] : candidates;
   }
-  return "gs"; // Linux / macOS
+
+  const candidates = [
+    "gs",
+    "/usr/bin/gs",
+    "/bin/gs",
+    "/nix/var/nix/profiles/default/bin/gs",
+    "/etc/profiles/per-user/root/bin/gs",
+    "ghostscript",
+  ];
+
+  return fromEnv ? [fromEnv, ...candidates] : candidates;
+}
+
+async function runGhostscript(args: string[], timeout = 120_000) {
+  const attempted: string[] = [];
+
+  for (const candidate of getGhostscriptCandidates()) {
+    attempted.push(candidate);
+    try {
+      await execFileAsync(candidate, args, { timeout });
+      return;
+    } catch (error: any) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+  }
+
+  throw new Error(
+    `Ghostscript binary not found. Tried: ${attempted.join(", ")}. ` +
+      `Set GS_BINARY env var to the full path of gs.`
+  );
 }
 
 const GS_QUALITY_SETTINGS = [
@@ -60,8 +94,7 @@ async function compressPdfWithGhostscript(
   await writeFile(inputPath, inputBuffer);
 
   try {
-    const gs = findGsBinary();
-    await execFileAsync(gs, [
+    await runGhostscript([
       "-sDEVICE=pdfwrite",
       "-dCompatibilityLevel=1.4",
       `-dPDFSETTINGS=${setting}`,
@@ -71,7 +104,7 @@ async function compressPdfWithGhostscript(
       "-dAutoRotatePages=/None",
       `-sOutputFile=${outputPath}`,
       inputPath,
-    ], { timeout: 120_000 });
+    ]);
 
     return await readFile(outputPath);
   } finally {
@@ -98,8 +131,7 @@ async function compressPdfCustomDpi(
   await writeFile(inputPath, inputBuffer);
 
   try {
-    const gs = findGsBinary();
-    await execFileAsync(gs, [
+    await runGhostscript([
       "-sDEVICE=pdfwrite",
       "-dCompatibilityLevel=1.4",
       "-dNOPAUSE",
@@ -128,7 +160,7 @@ async function compressPdfCustomDpi(
       "-dSubsetFonts=true",
       `-sOutputFile=${outputPath}`,
       inputPath,
-    ], { timeout: 120_000 });
+    ]);
 
     return await readFile(outputPath);
   } finally {
