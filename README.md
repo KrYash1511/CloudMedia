@@ -213,16 +213,19 @@ For full **PDF compression** support, this project relies on **[Ghostscript](htt
 - Standard serverless platforms (like Vercel) **do not** support Ghostscript installation.
 - Docker ensures the PDF compression engine runs correctly in production.
 
-### Deploy on Vercel (Limited PDF Support)
+### 🚀 Deploy on Render (Recommended)
 
-You can deploy on [Vercel](https://vercel.com/), but **PDF compression will likely fail** because Vercel Serverless Functions do not include Ghostscript. Video and Image features will work fine.
+This project includes a `render.yaml` Blueprint for 1-click deployment on Render. This method uses Docker to install **Ghostscript** automatically, which is required for PDF compression.
 
-1. Push your code to GitHub
-2. Import the project in Vercel
-3. Add environment variables
-4. Deploy!
+1. **Push your code** to GitHub.
+2. **Go to [Render Dashboard](https://dashboard.render.com/)**.
+3. Click **New +** and select **Blueprint**.
+4. Connect this repository.
+5. Render will automatically detect the `render.yaml` and prompt you for environment variables.
+6. **Add your Env Vars** (`DATABASE_URL`, Firebase keys, Cloudinary keys) in the Render dashboard.
+7. Click **Apply**.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/KrYash1511/CloudMedia)
+> **Note:** The `render.yaml` sets the build to use the included `Dockerfile`, ensuring all dependencies are present.
 
 ### Database Setup
 
