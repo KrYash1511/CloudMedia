@@ -200,13 +200,26 @@ model Video {
 
 ## 🚀 Deployment
 
-### Deploy on Vercel
+### 🐳 Docker Deployment (Recommended for PDF)
 
-The easiest way to deploy CloudMedia is with [Vercel](https://vercel.com/):
+For full **PDF compression** support, this project relies on **[Ghostscript](https://www.ghostscript.com/)**, which requires a system binary. We use Docker to ensure Ghostscript is installed and available.
+
+**Use this method for Platforms like Render, Railway, or Fly.io:**
+
+1. **Dockerfile included**: Installs Node.js + Ghostscript (`apt-get install ghostscript`).
+2. **Render Blueprint**: A `render.yaml` file is included for one-click configuration.
+
+**Why Docker?**
+- Standard serverless platforms (like Vercel) **do not** support Ghostscript installation.
+- Docker ensures the PDF compression engine runs correctly in production.
+
+### Deploy on Vercel (Limited PDF Support)
+
+You can deploy on [Vercel](https://vercel.com/), but **PDF compression will likely fail** because Vercel Serverless Functions do not include Ghostscript. Video and Image features will work fine.
 
 1. Push your code to GitHub
 2. Import the project in Vercel
-3. Add environment variables (including Firebase config)
+3. Add environment variables
 4. Deploy!
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/KrYash1511/CloudMedia)
