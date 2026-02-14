@@ -100,6 +100,8 @@ export default function CompressMediaClient() {
     return `${base}.${ext}`;
   }, [asset?.publicId, asset?.originalFormat, resultFormat]);
 
+  const MAX_VIDEO_MB = 100;
+
   const handleUpload = async (file: File) => {
     if (mediaKind === "photo" && !file.type.startsWith("image/")) {
       setError("Please choose an image file.");
@@ -113,6 +115,11 @@ export default function CompressMediaClient() {
     }
     if (mediaKind === "video" && !file.type.startsWith("video/")) {
       setError("Please choose a video file.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (mediaKind === "video" && file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setError(`Video file is too large (${formatBytes(file.size)}). Maximum allowed size is ${MAX_VIDEO_MB} MB.`);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -303,6 +310,11 @@ export default function CompressMediaClient() {
                 if (f) void handleUpload(f);
               }}
             />
+            {mediaKind === "video" && (
+              <p className="text-xs opacity-50">
+                Max video size: {MAX_VIDEO_MB} MB
+              </p>
+            )}
             {isUploading && <progress className="progress progress-primary w-full" />}
 
             {asset && (
